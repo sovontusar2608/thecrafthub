@@ -135,7 +135,6 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-const PORT = 5002;
 // =========================
 // Product API
 // =========================
