@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
+
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5002";
+
 function AdminDashboard({ admin, onLogout }) {
-
   const [products, setProducts] = useState([]);
-
   const [showForm, setShowForm] = useState(false);
-
   const [editingProduct, setEditingProduct] = useState(null);
-
   const [loading, setLoading] = useState(false);
-
   const [message, setMessage] = useState("");
 
   const [form, setForm] = useState({
@@ -20,16 +19,19 @@ function AdminDashboard({ admin, onLogout }) {
     image_url: "",
   });
 
+  // =========================
+  // LOAD PRODUCTS
+  // =========================
   const loadProducts = async () => {
     try {
-      const response = await fetch(
-        "http://localhost:5002/api/products"
-      );
+      const response = await fetch(`${API_URL}/api/products`);
 
       const data = await response.json();
 
       if (data.success) {
         setProducts(data.products);
+      } else {
+        console.error(data.message || "Failed to load products");
       }
     } catch (error) {
       console.error("Failed to load products:", error);
@@ -40,6 +42,9 @@ function AdminDashboard({ admin, onLogout }) {
     loadProducts();
   }, []);
 
+  // =========================
+  // FORM CHANGE
+  // =========================
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -47,6 +52,9 @@ function AdminDashboard({ admin, onLogout }) {
     });
   };
 
+  // =========================
+  // ADD / UPDATE PRODUCT
+  // =========================
   const handleAddProduct = async (e) => {
     e.preventDefault();
 
@@ -54,25 +62,42 @@ function AdminDashboard({ admin, onLogout }) {
     setMessage("");
 
     try {
-      const response = await fetch(
-        "http://localhost:5002/api/products",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(form),
-        }
-      );
+      const url = editingProduct
+        ? `${API_URL}/api/products/${editingProduct.id}`
+        : `${API_URL}/api/products`;
+
+      const method = editingProduct ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...form,
+          price: Number(form.price),
+          stock: Number(form.stock || 0),
+        }),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.message || "Failed to add product");
+        setMessage(
+          data.message ||
+            (editingProduct
+              ? "Failed to update product"
+              : "Failed to add product")
+        );
+
         return;
       }
 
-      setMessage("Product added successfully! ✅");
+      setMessage(
+        editingProduct
+          ? "Product updated successfully! ✅"
+          : "Product added successfully! ✅"
+      );
 
       setForm({
         name: "",
@@ -83,97 +108,52 @@ function AdminDashboard({ admin, onLogout }) {
         image_url: "",
       });
 
+      setEditingProduct(null);
       setShowForm(false);
 
       await loadProducts();
     } catch (error) {
+      console.error(error);
       setMessage("Server-এর সাথে connection হচ্ছে না।");
     } finally {
       setLoading(false);
     }
   };
-const handleEditProduct = (product) => {
-  setEditingProduct(product);
 
-  setForm({
-    name: product.name || "",
-    description: product.description || "",
-    price: product.price || "",
-    stock: product.stock || "",
-    category: product.category || "",
-    image_url: product.image_url || "",
-  });
-
-  setShowForm(true);
-  setMessage("");
-};
-  const handleDeleteProduct = async (id) => {const handleAddProduct = async (e) => {
-  e.preventDefault();
-
-  setLoading(true);
-  setMessage("");
-
-  try {
-    const url = editingProduct
-      ? `http://localhost:5002/api/products/${editingProduct.id}`
-      : "http://localhost:5002/api/products";
-
-    const method = editingProduct ? "PUT" : "POST";
-
-    const response = await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(form),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      setMessage(
-        data.message ||
-          (editingProduct
-            ? "Failed to update product"
-            : "Failed to add product")
-      );
-      return;
-    }
-
-    setMessage(
-      editingProduct
-        ? "Product updated successfully! ✅"
-        : "Product added successfully! ✅"
-    );
+  // =========================
+  // EDIT PRODUCT
+  // =========================
+  const handleEditProduct = (product) => {
+    setEditingProduct(product);
 
     setForm({
-      name: "",
-      description: "",
-      price: "",
-      stock: "",
-      category: "",
-      image_url: "",
+      name: product.name || "",
+      description: product.description || "",
+      price: product.price || "",
+      stock: product.stock || "",
+      category: product.category || "",
+      image_url: product.image_url || "",
     });
 
-    setEditingProduct(null);
-    setShowForm(false);
+    setShowForm(true);
+    setMessage("");
+  };
 
-    await loadProducts();
-  } catch (error) {
-    setMessage("Server-এর সাথে connection হচ্ছে না।");
-  } finally {
-    setLoading(false);
-  }
-};
+  // =========================
+  // DELETE PRODUCT
+  // =========================
+  const handleDeleteProduct = async (id) => {
     const confirmed = window.confirm(
       "Are you sure you want to delete this product?"
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       const response = await fetch(
-        `http://localhost:5002/api/products/${id}`,
+        `${API_URL}/api/products/${id}`,
         {
           method: "DELETE",
         }
@@ -187,8 +167,27 @@ const handleEditProduct = (product) => {
         alert(data.message || "Failed to delete product");
       }
     } catch (error) {
+      console.error(error);
       alert("Server-এর সাথে connection হচ্ছে না।");
     }
+  };
+
+  // =========================
+  // CLOSE / RESET FORM
+  // =========================
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingProduct(null);
+    setMessage("");
+
+    setForm({
+      name: "",
+      description: "",
+      price: "",
+      stock: "",
+      category: "",
+      image_url: "",
+    });
   };
 
   return (
@@ -199,7 +198,9 @@ const handleEditProduct = (product) => {
         fontFamily: "Arial, sans-serif",
       }}
     >
-      {/* Header */}
+      {/* =========================
+          HEADER
+      ========================= */}
       <header
         style={{
           background: "#222",
@@ -208,6 +209,7 @@ const handleEditProduct = (product) => {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: "20px",
         }}
       >
         <div>
@@ -239,6 +241,9 @@ const handleEditProduct = (product) => {
         </button>
       </header>
 
+      {/* =========================
+          MAIN
+      ========================= */}
       <main style={{ padding: "35px" }}>
         <h1 style={{ marginBottom: "8px" }}>
           Welcome, {admin?.name || "Admin"} 👋
@@ -253,7 +258,9 @@ const handleEditProduct = (product) => {
           Manage your The Craft Hub store from here.
         </p>
 
-        {/* Stats */}
+        {/* =========================
+            STATS
+        ========================= */}
         <div
           style={{
             display: "grid",
@@ -265,36 +272,36 @@ const handleEditProduct = (product) => {
         >
           <div className="admin-stat-card">
             <h3>Products</h3>
-
             <p>{products.length}</p>
           </div>
 
           <div className="admin-stat-card">
             <h3>Orders</h3>
-
             <p>0</p>
           </div>
 
           <div className="admin-stat-card">
             <h3>Customers</h3>
-
             <p>0</p>
           </div>
 
           <div className="admin-stat-card">
             <h3>Revenue</h3>
-
             <p>৳0</p>
           </div>
         </div>
 
-        {/* Products */}
+        {/* =========================
+            PRODUCTS HEADER
+        ========================= */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: "20px",
+            gap: "15px",
+            flexWrap: "wrap",
           }}
         >
           <div>
@@ -312,8 +319,12 @@ const handleEditProduct = (product) => {
 
           <button
             onClick={() => {
-              setShowForm(!showForm);
-              setMessage("");
+              if (showForm) {
+                handleCloseForm();
+              } else {
+                setShowForm(true);
+                setMessage("");
+              }
             }}
             style={{
               padding: "12px 20px",
@@ -329,7 +340,9 @@ const handleEditProduct = (product) => {
           </button>
         </div>
 
-        {/* Add Product Form */}
+        {/* =========================
+            ADD / EDIT PRODUCT FORM
+        ========================= */}
         {showForm && (
           <div
             style={{
@@ -341,7 +354,9 @@ const handleEditProduct = (product) => {
             }}
           >
             <h2 style={{ marginTop: 0 }}>
-              Add New Product
+              {editingProduct
+                ? "Edit Product"
+                : "Add New Product"}
             </h2>
 
             <form onSubmit={handleAddProduct}>
@@ -353,8 +368,17 @@ const handleEditProduct = (product) => {
                   gap: "18px",
                 }}
               >
+                {/* Product Name */}
                 <div>
-                  <label>Product Name</label>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Product Name
+                  </label>
 
                   <input
                     name="name"
@@ -362,22 +386,54 @@ const handleEditProduct = (product) => {
                     onChange={handleChange}
                     placeholder="Product name"
                     required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px",
+                      border: "1px solid #ddd",
+                      borderRadius: "8px",
+                    }}
                   />
                 </div>
 
+                {/* Category */}
                 <div>
-                  <label>Category</label>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Category
+                  </label>
 
                   <input
                     name="category"
                     value={form.category}
                     onChange={handleChange}
                     placeholder="Example: Handmade Crafts"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px",
+                      border: "1px solid #ddd",
+                      borderRadius: "8px",
+                    }}
                   />
                 </div>
 
+                {/* Price */}
                 <div>
-                  <label>Price (৳)</label>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Price (৳)
+                  </label>
 
                   <input
                     name="price"
@@ -388,11 +444,27 @@ const handleEditProduct = (product) => {
                     onChange={handleChange}
                     placeholder="500"
                     required
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px",
+                      border: "1px solid #ddd",
+                      borderRadius: "8px",
+                    }}
                   />
                 </div>
 
+                {/* Stock */}
                 <div>
-                  <label>Stock</label>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Stock
+                  </label>
 
                   <input
                     name="stock"
@@ -401,22 +473,54 @@ const handleEditProduct = (product) => {
                     value={form.stock}
                     onChange={handleChange}
                     placeholder="10"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px",
+                      border: "1px solid #ddd",
+                      borderRadius: "8px",
+                    }}
                   />
                 </div>
 
+                {/* Image URL */}
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <label>Image URL</label>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Image URL
+                  </label>
 
                   <input
                     name="image_url"
                     value={form.image_url}
                     onChange={handleChange}
                     placeholder="https://example.com/product.jpg"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px",
+                      border: "1px solid #ddd",
+                      borderRadius: "8px",
+                    }}
                   />
                 </div>
 
+                {/* Description */}
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <label>Description</label>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Description
+                  </label>
 
                   <textarea
                     name="description"
@@ -424,10 +528,19 @@ const handleEditProduct = (product) => {
                     onChange={handleChange}
                     placeholder="Describe your product..."
                     rows="5"
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "12px",
+                      border: "1px solid #ddd",
+                      borderRadius: "8px",
+                      resize: "vertical",
+                    }}
                   />
                 </div>
               </div>
 
+              {/* Message */}
               {message && (
                 <p
                   style={{
@@ -442,6 +555,7 @@ const handleEditProduct = (product) => {
                 </p>
               )}
 
+              {/* Submit */}
               <button
                 type="submit"
                 disabled={loading}
@@ -452,23 +566,28 @@ const handleEditProduct = (product) => {
                   borderRadius: "10px",
                   background: "#222",
                   color: "#fff",
-                  cursor: "pointer",
+                  cursor: loading
+                    ? "not-allowed"
+                    : "pointer",
                   fontWeight: "600",
+                  opacity: loading ? 0.7 : 1,
                 }}
               >
-               {loading
-  ? editingProduct
-    ? "Updating..."
-    : "Saving..."
-  : editingProduct
-    ? "Update Product"
-    : "Save Product"}
+                {loading
+                  ? editingProduct
+                    ? "Updating..."
+                    : "Saving..."
+                  : editingProduct
+                  ? "Update Product"
+                  : "Save Product"}
               </button>
             </form>
           </div>
         )}
 
-        {/* Product List */}
+        {/* =========================
+            PRODUCT LIST
+        ========================= */}
         <div
           style={{
             display: "grid",
@@ -488,6 +607,7 @@ const handleEditProduct = (product) => {
                   "0 5px 20px rgba(0,0,0,0.08)",
               }}
             >
+              {/* Product Image */}
               {product.image_url ? (
                 <img
                   src={product.image_url}
@@ -496,6 +616,9 @@ const handleEditProduct = (product) => {
                     width: "100%",
                     height: "200px",
                     objectFit: "cover",
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
                   }}
                 />
               ) : (
@@ -513,8 +636,13 @@ const handleEditProduct = (product) => {
                 </div>
               )}
 
+              {/* Product Details */}
               <div style={{ padding: "20px" }}>
-                <h3 style={{ margin: "0 0 8px" }}>
+                <h3
+                  style={{
+                    margin: "0 0 8px",
+                  }}
+                >
                   {product.name}
                 </h3>
 
@@ -532,7 +660,8 @@ const handleEditProduct = (product) => {
                     fontSize: "20px",
                   }}
                 >
-                  ৳{Number(product.price).toLocaleString()}
+                  ৳
+                  {Number(product.price).toLocaleString()}
                 </strong>
 
                 <p
@@ -543,20 +672,26 @@ const handleEditProduct = (product) => {
                 >
                   Stock: {product.stock}
                 </p>
-<button
-  onClick={() => handleEditProduct(product)}
-  style={{
-    padding: "9px 15px",
-    border: "none",
-    borderRadius: "8px",
-    background: "#222",
-    color: "#fff",
-    cursor: "pointer",
-    marginRight: "10px",
-  }}
->
-  Edit
-</button>
+
+                {/* Edit */}
+                <button
+                  onClick={() =>
+                    handleEditProduct(product)
+                  }
+                  style={{
+                    padding: "9px 15px",
+                    border: "none",
+                    borderRadius: "8px",
+                    background: "#222",
+                    color: "#fff",
+                    cursor: "pointer",
+                    marginRight: "10px",
+                  }}
+                >
+                  Edit
+                </button>
+
+                {/* Delete */}
                 <button
                   onClick={() =>
                     handleDeleteProduct(product.id)
@@ -577,6 +712,9 @@ const handleEditProduct = (product) => {
           ))}
         </div>
 
+        {/* =========================
+            EMPTY STATE
+        ========================= */}
         {products.length === 0 && !showForm && (
           <div
             style={{
@@ -585,9 +723,12 @@ const handleEditProduct = (product) => {
               textAlign: "center",
               borderRadius: "15px",
               color: "#777",
+              marginTop: "20px",
             }}
           >
-            <div style={{ fontSize: "50px" }}>📦</div>
+            <div style={{ fontSize: "50px" }}>
+              📦
+            </div>
 
             <h3>No products yet</h3>
 

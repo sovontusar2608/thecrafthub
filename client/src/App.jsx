@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import "./index.css";
 import AdminDashboard from "./AdminDashboard";
-
+const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5002";
 function App() {
   const [showLogin, setShowLogin] = useState(false);
     const [products, setProducts] = useState([]);
@@ -30,9 +31,8 @@ function App() {
     const loadProducts = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5002/api/products"
-        );
-
+  `${API_URL}/api/products`
+);
         const data = await response.json();
 
         if (data.success) {
@@ -115,8 +115,8 @@ const removeFromCart = (productId) => {
     setLoginMessage("");
 
     try {
-      const response = await fetch(
-        "http://localhost:5002/api/admin/login",
+    const response = await fetch(
+  `${API_URL}/api/admin/login`,
         {
           method: "POST",
           headers: {
